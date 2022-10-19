@@ -9,6 +9,9 @@ using System.Text;
 using System.Threading.Tasks;
 using AddMembersExample.Logic;
 using CodeFactory;
+using System.Runtime.Serialization;
+using System.ServiceModel.Channels;
+using CodeFactory.Formatting.CSharp;
 
 namespace AddMembersExample.ExplorerCommands.SourceCode
 {
@@ -70,6 +73,7 @@ namespace AddMembersExample.ExplorerCommands.SourceCode
         {
             try
             {
+                
                 //Local variable to keep track of the source code in the file.
                 var sourceCode = result.SourceCode;
 
@@ -86,6 +90,73 @@ namespace AddMembersExample.ExplorerCommands.SourceCode
                 if(!missingMembers.Any()) return;
 
                 
+                //Checking to make sure the logger namespace has been added to the source code file. 
+                if(!sourceCode.HasUsingStatement("Microsoft.Extensions.Logging"))
+                {   // adding the missing using statement
+                    sourceCode = await sourceCode.AddUsingStatementAsync("Microsoft.Extensions.Logging"); 
+
+                    //Reloading the class data from the updated source code.
+                    classData = sourceCode.GetModel(classData.LookupPath) as CsClass;
+                }
+
+                //User for formatting source code to be added to the source code file.
+                var formatter = new SourceFormatter();
+
+                //Checking to make sure there is a logger field that has been added to class.
+                if (!classData.Fields.Any(f => f.Name == "_logger"))
+                {
+                    //Formatting the source code for the logger field to be added to the class.
+                    formatter.AppendCodeLine(2,"/// <summary>");
+                    formatter.AppendCodeLine(2,"/// Field that is used for all logging in the class. Must be initlized in the constructor.");
+                    formatter.AppendCodeLine(2,"/// </summary>");
+                    formatter.AppendCodeLine(2,"private readonly ILogger _logger;");
+                    formatter.AppendCodeLine(2);
+
+                    //Adding the field source code to the beginning of the class definition.
+                    sourceCode = await classData.AddToBeginningAsync(formatter.ReturnSource());
+
+                    //Reloading the class datas from the updated source code. 
+                    classData = sourceCode.GetModel(classData.LookupPath) as CsClass;
+                }
+
+                //Checking all the target types for the missing members and making sure the using statements for the supporting types are added.
+                sourceCode = await sourceCode.AddMissingNamespaces(missingMembers,classData.Namespace);
+
+                //Reloading the class datas from the updated source code. 
+                classData = sourceCode.GetModel(classData.LookupPath) as CsClass;
+
+                //Loading all the target namespaces into the namespace manager so type definitions can be shortened.
+                var manager = new NamespaceManager(sourceCode.NamespaceReferences,classData.Namespace);
+
+
+                //Checking to see if the class has a constructor.
+                if(!classData.Methods.Any(m => m.MethodType == CsMethodType.Constructor & m.Parameters.Any(p => p.ParameterType.Namespace == "Microsoft.Extensions.Logging" & p.ParameterType.Name == "ILogger" )))
+                {
+                    //Clearing the formatter
+                    formatter.ResetFormatter();
+
+                    //formatting a constructor that includes passing the logger instance to the class.
+                    formatter.AppendCodeLine(2);
+                    formatter.AppendCodeLine(2,"/// <summary>");
+                    formatter.AppendCodeLine(2,$"/// Constructor that creates an instance of the <see cref=\"{classData.Name}\"/> class.");
+                    formatter.AppendCodeLine(2,"/// </summary>");
+                    formatter.AppendCodeLine(2,"/// <param name=\"logger\">The logger instance to handle logging for this class.</param>");
+                    formatter.AppendCodeLine(2,$"public {classData.Name}(ILogger<{classData.Name}> logger)");
+                    formatter.AppendCodeLine(2,"{");
+                    formatter.AppendCodeLine(3,"_logger = logger;");
+                    formatter.AppendCodeLine(2,"}");
+                    formatter.AppendCodeLine(2);
+
+                    //Writing the constructor code after the logger field.
+                    sourceCode = await classData.AddToEndAsync(formatter.ReturnSource());
+
+                    //Reloading the class data after the source code has been updated.
+                    classData = sourceCode.GetModel(classData.LookupPath) as CsClass;
+
+                }
+                    
+
+
                 //Loop through each missing member and add it to the class.
                 foreach (var missingMember in missingMembers)
                 {
@@ -99,11 +170,11 @@ namespace AddMembersExample.ExplorerCommands.SourceCode
 
                             var methodData = missingMember as CsMethod;
 
-                            var formattedSource = methodData.FormatMethodSyntax();
+                            var formattedSource = methodData.FormatMethodSyntax(manager);
 
                             if(string.IsNullOrEmpty(formattedSource)) continue;
 
-                            var formatter = new SourceFormatter();
+                            formatter.ResetFormatter();
                             formatter.AppendCodeBlock(2,formattedSource);
 
                             sourceCode = await classData.AddToEndAsync(formatter.ReturnSource());

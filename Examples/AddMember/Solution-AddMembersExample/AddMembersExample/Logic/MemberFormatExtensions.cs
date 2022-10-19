@@ -1,6 +1,8 @@
 ﻿using CodeFactory;
 using CodeFactory.DotNet.CSharp;
 using CodeFactory.Formatting.CSharp;
+using System.Linq;
+
 namespace AddMembersExample.Logic
 {
     /// <summary>
@@ -13,7 +15,7 @@ namespace AddMembersExample.Logic
         /// </summary>
         /// <param name="source">The source method model to generate the source </param>
         /// <returns>The fully formatted syntax for the method</returns>
-        public static string FormatMethodSyntax(this CsMethod source)
+        public static string FormatMethodSyntax(this CsMethod source,NamespaceManager manager)
         { 
             //If no source is found then we return an empty method format.
             if(source == null) return null;
@@ -39,18 +41,18 @@ namespace AddMembersExample.Logic
                 foreach (var attributeData in source.Attributes)
                 {
                     //Get the C# attribute for each attribute and append it to the formatter output.
-                    formatter.AppendCodeLine(0,attributeData.CSharpFormatAttributeSignature());
+                    formatter.AppendCodeLine(0,attributeData.CSharpFormatAttributeSignature(manager));
                 }    
             }
 
             //Generate the method signature and add it to the formatter.
-            formatter.AppendCodeLine(0,source.CSharpFormatStandardMethodSignatureWithAsync());
+            formatter.AppendCodeLine(0,source.CSharpFormatStandardMethodSignatureWithAsync(manager));
 
             //Adding the statement start for the method.
             formatter.AppendCodeLine(0,"{");
 
             //Adding entry point logging for the method.
-            formatter.AppendCodeLine(1,$"_logger.LogInformation(\"Entering Method {source.Name}\");");
+            formatter.AppendCodeLine(1,$"_logger.LogInformation($\"Entering Method {{nameof({source.Name})}}\");");
             formatter.AppendCodeLine(1);
 
             //Checking the method to see if has parameters. If so bounds check the parameters.
@@ -67,28 +69,83 @@ namespace AddMembersExample.Logic
                     //If the paramter is a string type then bounds check for empty or null
                     if(parmData.ParameterType.IsWellKnownType & parmData.ParameterType.WellKnownType == CsKnownLanguageType.String)
                     {
-                        formatter.AppendCodeLine(2,$"if(string.IsNullOrEmpty({parmData.Name}))");
-                        formatter.AppendCodeLine(2,"{");
-                        formatter.AppendCodeLine(3,$"_logger.LogError($\"The parameter '{{nameof({parmData.Name})}}' was not provided raising \");");
-                        formatter.AppendCodeLine(3,$"_logger.LogInformation(\"Exiting Method {source.Name}\")");
-                        formatter.AppendCodeLine(3,$"throw new ArgumentException(\"The required argument was missing data\",nameof({parmData.Name}));");
-                        formatter.AppendCodeLine(2,"}");
-                        formatter.AppendCodeLine(2);
+                        formatter.AppendCodeLine(1,$"if(string.IsNullOrEmpty({parmData.Name}))");
+                        formatter.AppendCodeLine(1,"{");
+                        formatter.AppendCodeLine(2,$"_logger.LogError($\"The parameter '{{nameof({parmData.Name})}}' was not provided raising \");");
+                        formatter.AppendCodeLine(2,$"_logger.LogInformation($\"Exiting Method {{nameof({source.Name})}}\");");
+                        formatter.AppendCodeLine(2,$"throw new ArgumentException(\"The required argument was missing data\",nameof({parmData.Name}));");
+                        formatter.AppendCodeLine(1,"}");
+                        formatter.AppendCodeLine(1);
                     }
                     //If the parameter is not a string then check for null condition.
                     else
                     { 
-                        formatter.AppendCodeLine(2,$"if({parmData.Name} == null)");
-                        formatter.AppendCodeLine(2,"{");
-                        formatter.AppendCodeLine(3,$"_logger.LogError($\"The parameter '{{nameof({parmData.Name})}}' was not provided raising \");");
-                        formatter.AppendCodeLine(3,$"_logger.LogInformation(\"Exiting Method {source.Name}\");");
-                        formatter.AppendCodeLine(3,$"throw new ArgumentNullException(\"The required argument was missing data\",nameof({parmData.Name}));");
-                        formatter.AppendCodeLine(2,"}");
-                        formatter.AppendCodeLine(2);
+                        formatter.AppendCodeLine(1,$"if({parmData.Name} == null)");
+                        formatter.AppendCodeLine(1,"{");
+                        formatter.AppendCodeLine(2,$"_logger.LogError($\"The parameter '{{nameof({parmData.Name})}}' was not provided raising \");");
+                        formatter.AppendCodeLine(2,$"_logger.LogInformation($\"Exiting Method {{nameof({source.Name})}}\");");
+                        formatter.AppendCodeLine(2,$"throw new ArgumentNullException(\"The required argument was missing data\",nameof({parmData.Name}));");
+                        formatter.AppendCodeLine(1,"}");
+                        formatter.AppendCodeLine(1);
                     }
                 }
             }
 
+            // Flag used to determing if the method has a return type to return.
+            bool hasReturnType = false;
+            CsType returnType = source.ReturnType;
+
+            // Determing if the method has a return type.
+            if(returnType != null)
+            {
+                //Checking to see if the return type is a task if so format for the correct return type.
+                if(source.ReturnType.Namespace == "System.Threading.Tasks" & source.ReturnType.Name == "Task")
+                {
+                    //If the task is a generic then extract the target type and set that as the return type.
+                    if(source.ReturnType.IsGeneric)
+                    {
+                        hasReturnType = true;
+
+                        returnType = source.ReturnType.GenericTypes.FirstOrDefault();
+
+
+                        // If we cannot find the return type then set the return type to false.
+                        if(returnType == null) 
+                        {
+                            hasReturnType = false; 
+                            returnType = null;
+                        }
+
+                    }
+                    else
+                    {
+                        //Is strictly a Task type. No return statement is needed for the async method.
+                        returnType = null;
+                    }
+                }
+            }
+
+            //Confirming that a return type is still set after checking the task.
+            if(returnType != null)
+            {
+
+                //Format the result variable to support a default value being set if supported.
+                if(returnType.IsValueType)
+                {
+                    hasReturnType = true;
+                    formatter.AppendCodeLine(1,string.IsNullOrEmpty(returnType.ValueTypeDefaultValue) ? $"{returnType.CSharpFormatTypeName(manager)} result;" : $"{returnType.CSharpFormatTypeName(manager)} result = {returnType.ValueTypeDefaultValue};"); 
+                    formatter.AppendCodeLine(1);
+                }
+                //Format the result variable and set its initial value to null.
+                else
+                {
+                    hasReturnType = true;
+                    formatter.AppendCodeLine(1,$"{returnType.CSharpFormatTypeName(manager)} result = null;");     
+                    formatter.AppendCodeLine(1);
+                }
+                
+            }
+            
             //Adding try and catch blocks for the method.
             formatter.AppendCodeLine(1,"try");
             formatter.AppendCodeLine(1,"{");
@@ -97,13 +154,20 @@ namespace AddMembersExample.Logic
             formatter.AppendCodeLine(1,"catch (Exception unhandledError)");
             formatter.AppendCodeLine(1,"{");
             formatter.AppendCodeLine(2,$"_logger.LogError(unhandledError, $\"An unhandled error occured in {source.Name}, see exception for details.\");");
-            formatter.AppendCodeLine(2,$"_logger.LogInformation(\"Exiting Method {source.Name}\");");
+            formatter.AppendCodeLine(2,$"_logger.LogInformation($\"Exiting Method {{nameof({source.Name})}}\");");
             formatter.AppendCodeLine(2,"throw unhandledError;");
             formatter.AppendCodeLine(1,"}");
             formatter.AppendCodeLine(1);
 
-            formatter.AppendCodeLine(1,$"_logger.LogInformation(\"Exiting Method {source.Name}\");");
+            formatter.AppendCodeLine(1,$"_logger.LogInformation($\"Exiting Method {{nameof({source.Name})}}\");");
             formatter.AppendCodeLine(1);
+            
+            if(hasReturnType)
+            { 
+                formatter.AppendCodeLine(1,"return result;" );
+                formatter.AppendCodeLine(1);
+            }
+            
 
             //Adding the statement end for the method.
             formatter.AppendCodeLine(0,"}");
