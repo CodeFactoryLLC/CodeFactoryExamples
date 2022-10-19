@@ -11,9 +11,117 @@ namespace AddMembersExample.Logic
     internal static class MemberFormatExtensions
     {
         /// <summary>
+        /// Formats a event definition as standard c# sytnax.
+        /// </summary>
+        /// <param name="source">The source event model to generate the source. </param>
+        /// <param name="manager">The namespace manager used to format namespaces on type definitions.</param>
+        /// <returns>The fully formatted syntax for the event.</returns>
+        public static string FormatEventSyntax(this CsEvent source, NamespaceManager manager)
+        { 
+            //If no source is found then we return an empty event format.
+            if(source == null) return null;
+            
+            //The source formatter formats the source code that will be emitted to the class.
+            SourceFormatter formatter = new SourceFormatter();
+
+            //Checking if the method has xml documentation.
+            if(source.HasDocumentation)
+            {
+                //Iterate over all the xml docs
+                foreach (var xmlDoc in source.CSharpFormatXmlDocumentationEnumerator())
+                {
+                    //Write the docs to the formatter.
+                    formatter.AppendCodeLine(0,xmlDoc);
+                }        
+            }
+
+            //If the method has attributes asigned to make sure they get included in the signature. 
+            if(source.HasAttributes)
+            {
+                //Iterate over the attributes
+                foreach (var attributeData in source.Attributes)
+                {
+                    //Get the C# attribute for each attribute and append it to the formatter output.
+                    formatter.AppendCodeLine(0,attributeData.CSharpFormatAttributeSignature(manager));
+                }    
+            }
+
+            //Formatting the event declaration.
+            formatter.AppendCodeLine(0,source.CSharpFormatEventDeclaration(manager));
+            formatter.AppendCodeLine(0);
+
+            return formatter.ReturnSource();
+
+        }
+
+        /// <summary>
+        /// Formats a property definition using standard property get and set syntax.
+        /// </summary>
+        /// <param name="source">The source property model to generate the source. </param>
+        /// <param name="manager">The namespace manager used to format namespaces on type definitions.</param>
+        /// <returns>The fully formatted syntax for the property.</returns>
+        public static string FormatPropertySyntax(this CsProperty source, NamespaceManager manager)
+        {
+            //If no source is found then we return an empty property format.
+            if(source == null) return null;
+            
+            //The source formatter formats the source code that will be emitted to the class.
+            SourceFormatter formatter = new SourceFormatter();
+
+
+            //Formatting the backing field for the property.
+            var fieldName  = $"_{source.Name.ConvertToCamelCase()}";
+
+            formatter.AppendCodeLine(0,"/// <summary>");
+            formatter.AppendCodeLine(0,$"/// Backing field for the property '{source.Name}'");
+            formatter.AppendCodeLine(0,"/// </summary>");
+            formatter.AppendCodeLine(0,$"private {source.PropertyType.CSharpFormatTypeName(manager)} {fieldName};");
+            formatter.AppendCodeLine(0);
+
+            //Checking if the method has xml documentation.
+            if(source.HasDocumentation)
+            {
+                //Iterate over all the xml docs
+                foreach (var xmlDoc in source.CSharpFormatXmlDocumentationEnumerator())
+                {
+                    //Write the docs to the formatter.
+                    formatter.AppendCodeLine(0,xmlDoc);
+                }        
+            }
+
+            //If the method has attributes asigned to make sure they get included in the signature. 
+            if(source.HasAttributes)
+            {
+                //Iterate over the attributes
+                foreach (var attributeData in source.Attributes)
+                {
+                    //Get the C# attribute for each attribute and append it to the formatter output.
+                    formatter.AppendCodeLine(0,attributeData.CSharpFormatAttributeSignature(manager));
+                }    
+            }
+
+            ////String builder to store the get and set accessors for the property
+            //StringBuilder getSetSignature  = new StringBuilder();
+
+            ////Adding the get key word if the property supports getting the property.
+            //if(source.HasGet) getSetSignature.Append("get; ");       
+            
+            ////Adding the set key word and setting its access based up if is defined in the property definition.
+            //getSetSignature.Append( source.HasSet ? "set;" : "private set;");
+
+            //formatter.AppendCodeLine(0,$"public {source.PropertyType.CSharpFormatTypeName(manager)} {source.Name} {{ {getSetSignature.ToString()} }}");
+            formatter.AppendCodeLine(0,source.CSharpFormatDefaultPropertySignatureWithBackingField(fieldName,manager));
+            formatter.AppendCodeLine(0);
+
+            return formatter.ReturnSource();
+        }
+
+
+        /// <summary>
         /// Formats a method with logging, bounds checking, and error handling managed in a try catch block
         /// </summary>
         /// <param name="source">The source method model to generate the source </param>
+        /// <param name="manager">The namespace manager used to format namespaces on type definitions.</param>
         /// <returns>The fully formatted syntax for the method</returns>
         public static string FormatMethodSyntax(this CsMethod source,NamespaceManager manager)
         { 
@@ -175,6 +283,18 @@ namespace AddMembersExample.Logic
 
             //Returning the full formatted source code.
             return formatter.ReturnSource();
+        }
+
+        /// <summary>
+        /// Converts a string to camel case format.
+        /// </summary>
+        /// <param name="source">string for formath the data.</param>
+        /// <returns>Formatted camel case format or null if no string is provided.</returns>
+        public static string ConvertToCamelCase(this string source)
+        { 
+            if(string.IsNullOrEmpty(source)) return null;
+            
+            return source.Length == 1 ? $"{source.Substring(0,1).ToLower()}" : $"{source.Substring(0,1).ToLower()}{source.Substring(1)}";
         }
     }
 }

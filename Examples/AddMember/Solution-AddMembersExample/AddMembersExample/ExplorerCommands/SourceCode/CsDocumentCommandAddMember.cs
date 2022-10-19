@@ -130,7 +130,7 @@ namespace AddMembersExample.ExplorerCommands.SourceCode
 
 
                 //Checking to see if the class has a constructor.
-                if(!classData.Methods.Any(m => m.MethodType == CsMethodType.Constructor & m.Parameters.Any(p => p.ParameterType.Namespace == "Microsoft.Extensions.Logging" & p.ParameterType.Name == "ILogger" )))
+                if(!classData.Constructors.Any(m => m.Parameters.Any(p => p.ParameterType.Namespace == "Microsoft.Extensions.Logging" & p.ParameterType.Name == "ILogger" )))
                 {
                     //Clearing the formatter
                     formatter.ResetFormatter();
@@ -155,27 +155,38 @@ namespace AddMembersExample.ExplorerCommands.SourceCode
 
                 }
                     
-
-
                 //Loop through each missing member and add it to the class.
                 foreach (var missingMember in missingMembers)
                 {
                     //Switching on the type of member that is missing
                     switch (missingMember.MemberType)
                     {
+                        //Getting the target event member and passing to logic to convert into a implemented event.
                         case CsMemberType.Event:
+                            var eventData = missingMember as CsEvent;
+
+                            var formattedEventSource = eventData.FormatEventSyntax(manager);
+
+                            if(string.IsNullOrEmpty(formattedEventSource)) continue;
+
+                            formatter.ResetFormatter();
+                            formatter.AppendCodeBlock(2,formattedEventSource);
+
+                            sourceCode = await classData.AddToEndAsync(formatter.ReturnSource());
+                            classData = sourceCode.GetModel(classData.LookupPath) as CsClass;
                             break;
 
+                        //Getting the target method member and passing to logic to convert into a implemented method.
                         case CsMemberType.Method:
 
                             var methodData = missingMember as CsMethod;
 
-                            var formattedSource = methodData.FormatMethodSyntax(manager);
+                            var formattedMethodSource = methodData.FormatMethodSyntax(manager);
 
-                            if(string.IsNullOrEmpty(formattedSource)) continue;
+                            if(string.IsNullOrEmpty(formattedMethodSource)) continue;
 
                             formatter.ResetFormatter();
-                            formatter.AppendCodeBlock(2,formattedSource);
+                            formatter.AppendCodeBlock(2,formattedMethodSource);
 
                             sourceCode = await classData.AddToEndAsync(formatter.ReturnSource());
 
@@ -183,7 +194,20 @@ namespace AddMembersExample.ExplorerCommands.SourceCode
 
                             break;
 
+                        //Getting the target property member and passing to logic to convert into a implemented property.
                         case CsMemberType.Property:
+
+                            var propertData = missingMember as CsProperty;
+
+                            var formattedPropertySource = propertData.FormatPropertySyntax(manager);
+
+                            if(string.IsNullOrEmpty(formattedPropertySource)) continue;
+
+                            formatter.ResetFormatter();
+                            formatter.AppendCodeBlock(2,formattedPropertySource);
+
+                            sourceCode = await classData.AddToEndAsync(formatter.ReturnSource());
+                            classData = sourceCode.GetModel(classData.LookupPath) as CsClass;
                             break;
 
                         default:
