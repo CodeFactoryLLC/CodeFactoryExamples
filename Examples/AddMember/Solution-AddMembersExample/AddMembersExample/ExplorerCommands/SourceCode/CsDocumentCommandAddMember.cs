@@ -147,7 +147,7 @@ namespace AddMembersExample.ExplorerCommands.SourceCode
                     formatter.AppendCodeLine(2,"}");
                     formatter.AppendCodeLine(2);
 
-                    //Writing the constructor code after the logger field.
+                    //Writing the constructor code at the end of the class definition.
                     sourceCode = await classData.AddToEndAsync(formatter.ReturnSource());
 
                     //Reloading the class data after the source code has been updated.
@@ -163,33 +163,51 @@ namespace AddMembersExample.ExplorerCommands.SourceCode
                     {
                         //Getting the target event member and passing to logic to convert into a implemented event.
                         case CsMemberType.Event:
+
+                            //Casting to the event model.
                             var eventData = missingMember as CsEvent;
 
+                            //Calling the logic extension method to format the event data.
                             var formattedEventSource = eventData.FormatEventSyntax(manager);
 
+                            //if no event source was returned then continue operations.
                             if(string.IsNullOrEmpty(formattedEventSource)) continue;
 
+                            //Resetting the formatter to make sure no old code is left in the formatter.
                             formatter.ResetFormatter();
+
+                            //Adding two additional indents to the returned source code, this places it at the right level in the source code file.
                             formatter.AppendCodeBlock(2,formattedEventSource);
 
+                            //Adding to the end of the class definition.
                             sourceCode = await classData.AddToEndAsync(formatter.ReturnSource());
+
+                            //Getting the updated class definition after the source code has been updated.
                             classData = sourceCode.GetModel(classData.LookupPath) as CsClass;
                             break;
 
                         //Getting the target method member and passing to logic to convert into a implemented method.
                         case CsMemberType.Method:
 
+                            //Casting to the method model.
                             var methodData = missingMember as CsMethod;
 
+                            //Calling the logic extension method to format the method data.
                             var formattedMethodSource = methodData.FormatMethodSyntax(manager);
 
+                            //If no method data was returned then continue.
                             if(string.IsNullOrEmpty(formattedMethodSource)) continue;
 
+                            //Resetting the formatter to make sure no old code is left in the formatter.
                             formatter.ResetFormatter();
+
+                            //Adding two additional indents to the returned source code, this places it at the right level in the source code file.
                             formatter.AppendCodeBlock(2,formattedMethodSource);
 
+                            //Adding to the end of the class definition.
                             sourceCode = await classData.AddToEndAsync(formatter.ReturnSource());
 
+                            //Getting the updated class definition after the source code has been updated.
                             classData = sourceCode.GetModel(classData.LookupPath) as CsClass;
 
                             break;
@@ -197,16 +215,25 @@ namespace AddMembersExample.ExplorerCommands.SourceCode
                         //Getting the target property member and passing to logic to convert into a implemented property.
                         case CsMemberType.Property:
 
+                            //Casting to the property model.
                             var propertData = missingMember as CsProperty;
 
+                            //Calling the logic extension method to format the property data.
                             var formattedPropertySource = propertData.FormatPropertySyntax(manager);
 
+                            //If no property data was returned then continue.
                             if(string.IsNullOrEmpty(formattedPropertySource)) continue;
 
+                            //Resetting the formatter to make sure no old code is left in the formatter.
                             formatter.ResetFormatter();
+
+                            //Adding two additional indents to the returned source code, this places it at the right level in the source code file.
                             formatter.AppendCodeBlock(2,formattedPropertySource);
 
+                            //Adding to the end of the class definition.
                             sourceCode = await classData.AddToEndAsync(formatter.ReturnSource());
+
+                            //Getting the updated class definition after the source code has been updated.
                             classData = sourceCode.GetModel(classData.LookupPath) as CsClass;
                             break;
 

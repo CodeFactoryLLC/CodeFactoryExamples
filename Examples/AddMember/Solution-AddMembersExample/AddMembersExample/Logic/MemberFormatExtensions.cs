@@ -100,15 +100,6 @@ namespace AddMembersExample.Logic
                 }    
             }
 
-            ////String builder to store the get and set accessors for the property
-            //StringBuilder getSetSignature  = new StringBuilder();
-
-            ////Adding the get key word if the property supports getting the property.
-            //if(source.HasGet) getSetSignature.Append("get; ");       
-            
-            ////Adding the set key word and setting its access based up if is defined in the property definition.
-            //getSetSignature.Append( source.HasSet ? "set;" : "private set;");
-
             //formatter.AppendCodeLine(0,$"public {source.PropertyType.CSharpFormatTypeName(manager)} {source.Name} {{ {getSetSignature.ToString()} }}");
             formatter.AppendCodeLine(0,source.CSharpFormatDefaultPropertySignatureWithBackingField(fieldName,manager));
             formatter.AppendCodeLine(0);
