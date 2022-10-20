@@ -1,10 +1,10 @@
 # [cF] CodeFactory Examples
 
-This repository focuses on a providing a series of examples that will give the user an understand of how to use the different capabilities of **CodeFactory**.
+This repository includes examples which will demonstrate a variety of **CodeFactory** capabilities.
 
-The following is the breakdown of the current live examples.
+Examples of re-usable code-automation commands are listed below.
 
 |Example|Description|Overview Documentation|
 |---|---|---|
-|Add Missing Members|Implements interface members that are missing from a class implementation.|[Add Members Overview](Examples/AddMember/Index.md)
+|Add Missing Members|Auto-implements interface members which are missing from a class implementation.|[Add Members Overview](Examples/AddMember/Index.md)
 
